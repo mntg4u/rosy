@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto Join Request Bot</title>
+    <link rel="stylesheet" href="static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Auto Join Request Bot</h1>
+        <p>Enter your bot token to run the bot and accept join requests automatically.</p>
+        <form id="botForm" action="/start" method="POST">
+            <label for="bot_token">Bot Token:</label>
+            <input type="text" id="bot_token" name="bot_token" required placeholder="Enter your bot token here">
+            <button type="submit">Start Bot</button>
+        </form>
+    </div>
+</body>
+</html>
