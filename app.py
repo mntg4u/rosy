@@ -1,6 +1,8 @@
 from flask import Flask, render_template, request, redirect, url_for
 import os
 import logging
+import asyncio
+import threading
 from pyrogram import Client
 from pyrogram.errors import UserIsBlocked, PeerIdInvalid
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -45,46 +47,51 @@ def index():
         return redirect(url_for('run_bot', token=bot_token))
     return render_template("index.html")
 
+def run_async_bot(bot_token):
+    """Function to run the bot asynchronously."""
+    app = Client("my_bot", bot_token=bot_token)
+
+    @app.on_chat_join_request()
+    async def accept_request(client, r):
+        try:
+            rm = InlineKeyboardMarkup([[
+                InlineKeyboardButton('🎉 Add Me To Your Groups 🎉', url=f'http://t.me/{CONFIG["bot_username"]}?startgroup=true')
+            ], [
+                InlineKeyboardButton('OTT Updates', url=CONFIG["ott_updates_channel_url"]),
+                InlineKeyboardButton('Main Channel', url=CONFIG["main_channel_url"])
+            ]])
+
+            greeting = get_greeting(r.from_user.language_code or 'en')
+
+            welcome_text = CONFIG["welcome_message"].format(
+                greeting=greeting, 
+                name=r.from_user.first_name or r.from_user.username,
+                chat_name=r.chat.title
+            )
+
+            await client.send_photo(r.from_user.id, CONFIG["photo_url"], welcome_text, reply_markup=rm, parse_mode=ParseMode.MARKDOWN)
+            await r.approve()
+
+            logger.info(f"Processed join request from {r.from_user.username} in {r.chat.title}")
+        except UserIsBlocked:
+            logger.warning(f"User {r.from_user.username} has blocked the bot.")
+        except PeerIdInvalid:
+            logger.error(f"Invalid Peer ID when processing request for {r.from_user.username}.")
+        except Exception as e:
+            logger.error(f"Unexpected error: {str(e)}")
+
+    app.run()
+
 @app.route("/start", methods=["GET", "POST"])
 def run_bot():
     """Runs the bot and accepts join requests."""
     if request.method == "POST":
         bot_token = request.form['bot_token']
         try:
-            app = Client("my_bot", bot_token=bot_token)
-
-            @app.on_chat_join_request()
-            async def accept_request(client, r):
-                try:
-                    rm = InlineKeyboardMarkup([[
-                        InlineKeyboardButton('🎉 Add Me To Your Groups 🎉', url=f'http://t.me/{CONFIG["bot_username"]}?startgroup=true')
-                    ], [
-                        InlineKeyboardButton('OTT Updates', url=CONFIG["ott_updates_channel_url"]),
-                        InlineKeyboardButton('Main Channel', url=CONFIG["main_channel_url"])
-                    ]])
-
-                    greeting = get_greeting(r.from_user.language_code or 'en')
-
-                    welcome_text = CONFIG["welcome_message"].format(
-                        greeting=greeting, 
-                        name=r.from_user.first_name or r.from_user.username,
-                        chat_name=r.chat.title
-                    )
-
-                    await client.send_photo(r.from_user.id, CONFIG["photo_url"], welcome_text, reply_markup=rm, parse_mode=ParseMode.MARKDOWN)
-                    await r.approve()
-
-                    logger.info(f"Processed join request from {r.from_user.username} in {r.chat.title}")
-                except UserIsBlocked:
-                    logger.warning(f"User {r.from_user.username} has blocked the bot.")
-                except PeerIdInvalid:
-                    logger.error(f"Invalid Peer ID when processing request for {r.from_user.username}.")
-                except Exception as e:
-                    logger.error(f"Unexpected error: {str(e)}")
-
-            app.run()
+            # Start bot in a new thread to avoid blocking Flask's main thread
+            bot_thread = threading.Thread(target=run_async_bot, args=(bot_token,))
+            bot_thread.start()
             return f"Bot running with token {bot_token}. Please check your bot!"
-
         except Exception as e:
             logger.error(f"Error starting bot: {str(e)}")
             return f"Failed to start bot: {str(e)}"
