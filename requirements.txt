@@ -1,2 +1,2 @@
-Flask
-pyrogram
+Flask==2.3.2
+pyrotgfork
