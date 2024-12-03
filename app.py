@@ -45,48 +45,53 @@ def index():
         return redirect(url_for('run_bot', token=bot_token))
     return render_template("index.html")
 
-@app.route("/start/<token>", methods=["GET"])
-def run_bot(token):
+@app.route("/start", methods=["GET", "POST"])
+def run_bot():
     """Runs the bot and accepts join requests."""
-    try:
-        app = Client("my_bot", bot_token=token)
+    if request.method == "POST":
+        bot_token = request.form['bot_token']
+        try:
+            app = Client("my_bot", bot_token=bot_token)
 
-        @app.on_chat_join_request()
-        async def accept_request(client, r):
-            try:
-                rm = InlineKeyboardMarkup([[
-                    InlineKeyboardButton('🎉 Add Me To Your Groups 🎉', url=f'http://t.me/{CONFIG["bot_username"]}?startgroup=true')
-                ], [
-                    InlineKeyboardButton('OTT Updates', url=CONFIG["ott_updates_channel_url"]),
-                    InlineKeyboardButton('Main Channel', url=CONFIG["main_channel_url"])
-                ]])
+            @app.on_chat_join_request()
+            async def accept_request(client, r):
+                try:
+                    rm = InlineKeyboardMarkup([[
+                        InlineKeyboardButton('🎉 Add Me To Your Groups 🎉', url=f'http://t.me/{CONFIG["bot_username"]}?startgroup=true')
+                    ], [
+                        InlineKeyboardButton('OTT Updates', url=CONFIG["ott_updates_channel_url"]),
+                        InlineKeyboardButton('Main Channel', url=CONFIG["main_channel_url"])
+                    ]])
 
-                greeting = get_greeting(r.from_user.language_code or 'en')
+                    greeting = get_greeting(r.from_user.language_code or 'en')
 
-                welcome_text = CONFIG["welcome_message"].format(
-                    greeting=greeting, 
-                    name=r.from_user.first_name or r.from_user.username,
-                    chat_name=r.chat.title
-                )
+                    welcome_text = CONFIG["welcome_message"].format(
+                        greeting=greeting, 
+                        name=r.from_user.first_name or r.from_user.username,
+                        chat_name=r.chat.title
+                    )
 
-                await client.send_photo(r.from_user.id, CONFIG["photo_url"], welcome_text, reply_markup=rm, parse_mode=ParseMode.MARKDOWN)
-                await r.approve()
+                    await client.send_photo(r.from_user.id, CONFIG["photo_url"], welcome_text, reply_markup=rm, parse_mode=ParseMode.MARKDOWN)
+                    await r.approve()
 
-                logger.info(f"Processed join request from {r.from_user.username} in {r.chat.title}")
-            except UserIsBlocked:
-                logger.warning(f"User {r.from_user.username} has blocked the bot.")
-            except PeerIdInvalid:
-                logger.error(f"Invalid Peer ID when processing request for {r.from_user.username}.")
-            except Exception as e:
-                logger.error(f"Unexpected error: {str(e)}")
+                    logger.info(f"Processed join request from {r.from_user.username} in {r.chat.title}")
+                except UserIsBlocked:
+                    logger.warning(f"User {r.from_user.username} has blocked the bot.")
+                except PeerIdInvalid:
+                    logger.error(f"Invalid Peer ID when processing request for {r.from_user.username}.")
+                except Exception as e:
+                    logger.error(f"Unexpected error: {str(e)}")
 
-        app.run()
-        return f"Bot running with token {token}. Please check your bot!"
+            app.run()
+            return f"Bot running with token {bot_token}. Please check your bot!"
 
-    except Exception as e:
-        logger.error(f"Error starting bot: {str(e)}")
-        return f"Failed to start bot: {str(e)}"
+        except Exception as e:
+            logger.error(f"Error starting bot: {str(e)}")
+            return f"Failed to start bot: {str(e)}"
+    
+    return redirect(url_for("index"))
 
 if __name__ == "__main__":
     # Ensure Flask listens on all network interfaces and uses the correct port
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)), debug=True)
+
