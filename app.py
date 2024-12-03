@@ -88,4 +88,5 @@ def run_bot(token):
         return f"Failed to start bot: {str(e)}"
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # Ensure Flask listens on all network interfaces and uses the correct port
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)), debug=True)
